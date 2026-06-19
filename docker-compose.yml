@@ -1,0 +1,8 @@
+# docker-compose.yml — local development stack.
+# Services:
+#   - postgres       (verdict history + metadata)
+#   - middleware     (FastAPI on :8000)
+#   - web-dashboard  (Vite dev server on :3000)
+#   - db-updater     (one-shot / cron job for refreshing the local KB)
+#
+# Real `.env` (not committed) is loaded automatically.

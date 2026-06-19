@@ -1,0 +1,2 @@
+# package.json for the browser extension.
+# Manifest V3, React + TypeScript. Build target: ui-client/browser-extension/dist/.

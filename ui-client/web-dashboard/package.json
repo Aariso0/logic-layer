@@ -1,0 +1,3 @@
+# package.json for the web dashboard.
+# React + TypeScript + Vite. Standalone web UI for inspecting verdict history,
+# managing the local knowledge base, and viewing pipeline metrics.

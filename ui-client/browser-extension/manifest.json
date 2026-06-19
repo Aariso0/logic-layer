@@ -1,0 +1,3 @@
+# manifest.json (MV3) for the browser extension.
+# Permissions: activeTab, scripting, storage, and host permissions for the
+# target AI agent sites the extension wraps. Updated per PLAN.md §3 (UI/Client role).

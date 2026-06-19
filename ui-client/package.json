@@ -1,0 +1,3 @@
+# Root package.json for the UI client monorepo.
+# Both browser-extension/ and web-dashboard/ have their own package.json;
+# this top-level one only wires workspaces and shared scripts (lint, typecheck, test).

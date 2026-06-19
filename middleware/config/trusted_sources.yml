@@ -1,0 +1,3 @@
+# Whitelisted domains for Layer 2 of the verification pipeline.
+# YAML format: list of { domain, category, added_on, last_verified, notes }.
+# Adding/removing entries here is governed — see PLAN.md §6 (whitelist governance).

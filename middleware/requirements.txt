@@ -1,0 +1,2 @@
+# Python dependencies for the middleware (FastAPI, uvicorn, pydantic, sqlalchemy, etc.).
+# Pinned versions once chosen; tracked in a lock file for reproducible installs.
