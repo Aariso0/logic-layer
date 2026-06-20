@@ -23,7 +23,7 @@
 /middleware/verification/trusted_source_check/ @Aariso0
 /middleware/verification/contradiction_detector/ @Aariso0
 
-# Local knowledge base
+    # Local knowledge base
 /local-knowledge-base/                       @Aariso0
 
 # Universal UI client
