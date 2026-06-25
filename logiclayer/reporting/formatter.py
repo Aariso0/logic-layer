@@ -7,11 +7,21 @@ verification orchestrator into structured, human-readable CLI output.
 Responsibilities:
     - Validate incoming verdict dictionaries.
     - Convert dictionaries into strongly typed Verdict objects.
-    - Detect hallucinated claims.
     - Format individual verdicts.
     - Generate complete verification reports.
 
 The formatter is presentation-only and contains no verification logic.
+
+Note:
+    Hallucinated verdict type has been removed per owner review.
+    Claims with no evidence footprint are treated as unverified
+    since we cannot prove hallucination with certainty.
+
+Usage (by Anay in orchestrator.py):
+    from logiclayer.reporting.formatter import format_report
+
+    verdicts = run_verification(raw_response)
+    print(format_report(verdicts))
 """
 
 from __future__ import annotations
@@ -30,34 +40,17 @@ class Verdict:
     Attributes:
         claim:
             The atomic factual claim that was checked.
-
         verdict:
-            One of:
-                - verified
-                - wrong
-                - unverified
-
+            One of: verified, wrong, unverified
         evidence:
             Evidence supporting or contradicting the claim.
-
         source_url:
             URL of the source providing evidence.
-
         correction:
             Correct statement for wrong claims.
-
         tier_used:
             Verification tier that produced the result.
             "none" indicates no tier found evidence.
-
-    Example:
-        >>> Verdict(
-        ...     claim="Paris is the capital of France",
-        ...     verdict="verified",
-        ...     evidence="Government reference",
-        ...     source_url="https://example.com",
-        ...     tier_used="tier1",
-        ... )
     """
 
     claim: str
@@ -72,17 +65,14 @@ def _parse_verdict(raw: Mapping[str, Any]) -> Verdict:
     """Convert a raw verdict dictionary into a Verdict object.
 
     Args:
-        raw:
-            Raw verdict dictionary containing at minimum:
-                - claim
-                - verdict
+        raw: Raw verdict dictionary containing at minimum
+            'claim' and 'verdict'.
 
     Returns:
         Parsed Verdict instance.
 
     Raises:
-        ValueError:
-            If required fields are missing or the verdict
+        ValueError: If required fields are missing or verdict
             type is invalid.
     """
     required_fields = ("claim", "verdict")
@@ -112,43 +102,17 @@ def _parse_verdict(raw: Mapping[str, Any]) -> Verdict:
     )
 
 
-def _is_hallucinated(verdict: Verdict) -> bool:
-    """Determine whether a wrong claim is a hallucination.
-
-    Notes:
-        Wrong claim:
-            Evidence exists and contradicts the claim.
-
-        Hallucinated claim:
-            No evidence footprint exists and no verification
-            tier was able to support the claim.
-
-    Args:
-        verdict:
-            Parsed Verdict object.
-
-    Returns:
-        True if the verdict is considered hallucinated.
-    """
-    return (
-        verdict.verdict == "wrong"
-        and verdict.tier_used == "none"
-    )
-
-
 def _format_verified(verdict: Verdict) -> str:
     """Format a verified verdict for CLI output."""
     source = verdict.source_url or "local knowledge base"
     evidence = verdict.evidence or "matched local fact"
 
-    return "\n".join(
-        [
-            "  ✓  VERIFIED",
-            f"     Claim    : {verdict.claim}",
-            f"     Evidence : {evidence}",
-            f"     Source   : {source}",
-        ]
-    )
+    return "\n".join([
+        "  ✓  VERIFIED",
+        f"     Claim    : {verdict.claim}",
+        f"     Evidence : {evidence}",
+        f"     Source   : {source}",
+    ])
 
 
 def _format_wrong(verdict: Verdict) -> str:
@@ -158,56 +122,43 @@ def _format_wrong(verdict: Verdict) -> str:
         or verdict.evidence
         or "see source"
     )
-
     source = verdict.source_url or "local knowledge base"
 
-    if _is_hallucinated(verdict):
-        label = "  ⚡  HALLUCINATED"
-        note = (
-            "     Note     : AI invented this claim. "
-            "No supporting evidence was found."
-        )
-    else:
-        label = "  ✗  WRONG"
-        note = None
-
-    lines = [
-        label,
+    return "\n".join([
+        "  ✗  WRONG",
         f"     AI said  : {verdict.claim}",
         f"     Truth    : {correct}",
         f"     Source   : {source}",
-    ]
-
-    if note:
-        lines.append(note)
-
-    return "\n".join(lines)
+    ])
 
 
 def _format_unverified(verdict: Verdict) -> str:
-    """Format an unverified verdict for CLI output."""
-    return "\n".join(
-        [
-            "  ⚠  UNVERIFIED",
-            f"     Claim    : {verdict.claim}",
-            (
-                "     Status   : No evidence found in local "
-                "database or trusted sources."
-            ),
-            (
-                "     Action   : Treat this claim with caution "
-                "and verify independently."
-            ),
-        ]
-    )
+    """Format an unverified verdict for CLI output.
+
+    Note:
+        This also covers cases where no evidence footprint
+        exists. Per owner review, we cannot prove hallucination
+        with certainty so unverified is the honest label.
+    """
+    return "\n".join([
+        "  ⚠  UNVERIFIED",
+        f"     Claim    : {verdict.claim}",
+        (
+            "     Status   : No evidence found in local "
+            "database or trusted sources."
+        ),
+        (
+            "     Action   : Treat this claim with caution "
+            "and verify independently."
+        ),
+    ])
 
 
 def format_verdict(raw: Mapping[str, Any]) -> str:
     """Format a single verdict dictionary.
 
     Args:
-        raw:
-            Raw verdict dictionary.
+        raw: Raw verdict dictionary.
 
     Returns:
         Human-readable verdict block.
@@ -221,13 +172,10 @@ def format_verdict(raw: Mapping[str, Any]) -> str:
     match verdict.verdict:
         case "verified":
             return _format_verified(verdict)
-
         case "wrong":
             return _format_wrong(verdict)
-
         case "unverified":
             return _format_unverified(verdict)
-
         case _:
             return (
                 "  ?  UNKNOWN VERDICT TYPE "
@@ -240,28 +188,16 @@ def format_report(
 ) -> str:
     """Generate a complete verification report.
 
-    The report is ordered by urgency:
-
-        1. Wrong / hallucinated claims
+    Report ordered by urgency:
+        1. Wrong claims
         2. Unverified claims
         3. Verified claims
 
     Args:
-        verdicts:
-            Collection of raw verdict dictionaries.
+        verdicts: Collection of raw verdict dictionaries.
 
     Returns:
         Fully formatted CLI report.
-
-    Example:
-        >>> verdicts = [
-        ...     {
-        ...         "claim": "Earth has two moons",
-        ...         "verdict": "wrong",
-        ...         "correction": "Earth has one moon",
-        ...     }
-        ... ]
-        >>> print(format_report(verdicts))
     """
     wide = "━" * 56
     sep = "─" * 56
@@ -270,17 +206,14 @@ def format_report(
         logger.warning(
             "format_report called with empty verdict list"
         )
-
         return (
-            f"\n"
-            f"{wide}\n"
+            f"\n{wide}\n"
             f"  LOGIC LAYER — VERIFICATION REPORT\n"
             f"{wide}\n"
             f"  No claims were identified in the response.\n"
             f"{wide}"
         )
 
-    # Parse all verdicts once to avoid repeated validation.
     parsed_verdicts: list[Verdict] = []
     parse_errors: list[str] = []
 
@@ -288,128 +221,58 @@ def format_report(
         try:
             parsed_verdicts.append(_parse_verdict(raw))
         except ValueError as error:
-            logger.error(
-                "Skipping malformed verdict: %s",
-                error,
-            )
+            logger.error("Skipping malformed verdict: %s", error)
             parse_errors.append(str(error))
 
-    verified = [
-        v for v in parsed_verdicts
-        if v.verdict == "verified"
-    ]
+    verified   = [v for v in parsed_verdicts if v.verdict == "verified"]
+    wrong      = [v for v in parsed_verdicts if v.verdict == "wrong"]
+    unverified = [v for v in parsed_verdicts if v.verdict == "unverified"]
+    total      = len(parsed_verdicts)
 
-    wrong = [
-        v for v in parsed_verdicts
-        if v.verdict == "wrong"
-    ]
-
-    unverified = [
-        v for v in parsed_verdicts
-        if v.verdict == "unverified"
-    ]
-
-    hallucinated = [
-        v for v in wrong
-        if _is_hallucinated(v)
-    ]
-
-    total = len(parsed_verdicts)
-
-    summary = "  " + "  |  ".join(
-        [
-            f"{len(verified)} verified",
-            f"{len(wrong)} wrong",
-            f"{len(hallucinated)} hallucinated",
-            f"{len(unverified)} unverified",
-            f"{total} total",
-        ]
-    )
+    summary = "  " + "  |  ".join([
+        f"{len(verified)} verified",
+        f"{len(wrong)} wrong",
+        f"{len(unverified)} unverified",
+        f"{total} total",
+    ])
 
     sections: list[str] = []
 
-    # Highest-priority findings appear first.
     if wrong:
-        sections.extend(
-            [
-                "WRONG / HALLUCINATED CLAIMS",
-                sep,
-            ]
-        )
-
+        sections.extend(["WRONG CLAIMS", sep])
         for verdict in wrong:
-            sections.append(
-                _format_wrong(verdict)
-            )
+            sections.append(_format_wrong(verdict))
             sections.append("")
 
     if unverified:
-        sections.extend(
-            [
-                "UNVERIFIED CLAIMS",
-                sep,
-            ]
-        )
-
+        sections.extend(["UNVERIFIED CLAIMS", sep])
         for verdict in unverified:
-            sections.append(
-                _format_unverified(verdict)
-            )
+            sections.append(_format_unverified(verdict))
             sections.append("")
 
     if verified:
-        sections.extend(
-            [
-                "VERIFIED CLAIMS",
-                sep,
-            ]
-        )
-
+        sections.extend(["VERIFIED CLAIMS", sep])
         for verdict in verified:
-            sections.append(
-                _format_verified(verdict)
-            )
+            sections.append(_format_verified(verdict))
             sections.append("")
 
-    # Show parsing failures separately so users know
-    # some verdicts could not be processed.
     if parse_errors:
-        sections.extend(
-            [
-                "PARSE ERRORS",
-                sep,
-            ]
-        )
-
+        sections.extend(["PARSE ERRORS", sep])
         for error in parse_errors:
-            sections.append(
-                f"  ?  {error}"
-            )
+            sections.append(f"  ?  {error}")
             sections.append("")
 
     output_lines = [
-        "",
-        wide,
+        "", wide,
         "  LOGIC LAYER — VERIFICATION REPORT",
-        wide,
-        summary,
-        wide,
-        "",
-        *sections,
-        wide,
+        wide, summary, wide, "",
+        *sections, wide,
     ]
 
     logger.info(
-        (
-            "Report formatted: "
-            "%d total, %d wrong, "
-            "%d unverified, %d verified"
-        ),
-        total,
-        len(wrong),
-        len(unverified),
-        len(verified),
+        "Report formatted: %d total, %d wrong, "
+        "%d unverified, %d verified",
+        total, len(wrong), len(unverified), len(verified),
     )
 
     return "\n".join(output_lines)
-
