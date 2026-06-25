@@ -12,6 +12,5 @@ class Source(BaseModel):
 
 class Fact(BaseModel):
     fact_id: str = Field(..., description="Unique string identifier for the fact (e.g., fact_001)")
-    claim: str = Field(..., description="The clean textual assertion used for semantic embedding search")
-    value: str = Field(..., description="The detailed background truth data or context metrics")
+    statement: str = Field(..., description="The full factual statement, used for both exact-match and embedding search")
     source_id: str = Field(..., description="The associated source ID tracking back to the source model")

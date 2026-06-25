@@ -1,6 +1,5 @@
 {
   "fact_id": "fact_011",
-  "claim": "Earth's average distance from the Sun",
-  "value": "About 93 million miles (150 million kilometers), defined as 1 astronomical unit",
+  "statement": "Earth's average distance from the Sun: About 93 million miles (150 million kilometers), defined as 1 astronomical unit",
   "source_id": "src_009"
 }

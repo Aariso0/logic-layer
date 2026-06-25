@@ -29,8 +29,7 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS facts (
             fact_id TEXT PRIMARY KEY,
-            claim TEXT NOT NULL,
-            value TEXT NOT NULL,
+            statement TEXT NOT NULL,
             source_id TEXT NOT NULL,
             FOREIGN KEY (source_id) REFERENCES sources (source_id)
         )
@@ -40,9 +39,6 @@ def init_db():
 
 
 def load_sources(conn: sqlite3.Connection) -> set[str]:
-    """Reads every JSON file in SOURCES_DIR, validates it, writes it to the
-    sources table. Returns the set of source_ids that loaded successfully --
-    load_facts() uses this set to catch orphan facts before they're written."""
     cursor = conn.cursor()
     loaded_ids: set[str] = set()
 
@@ -66,10 +62,6 @@ def load_sources(conn: sqlite3.Connection) -> set[str]:
 
 
 def load_facts(conn: sqlite3.Connection, known_source_ids: set[str]) -> list[tuple[str, str]]:
-    """Reads every JSON file in FACTS_DIR, validates it, writes valid ones to
-    the facts table. Facts citing a source_id not in known_source_ids are
-    orphans -- they are NOT written, and are returned so the caller can
-    report them loudly instead of silently dropping them."""
     cursor = conn.cursor()
     orphans: list[tuple[str, str]] = []
 
@@ -86,8 +78,8 @@ def load_facts(conn: sqlite3.Connection, known_source_ids: set[str]) -> list[tup
             continue
 
         cursor.execute(
-            "INSERT OR REPLACE INTO facts VALUES (?, ?, ?, ?)",
-            (fact.fact_id, fact.claim, fact.value, fact.source_id),
+            "INSERT OR REPLACE INTO facts VALUES (?, ?, ?)",
+            (fact.fact_id, fact.statement, fact.source_id),
         )
 
     conn.commit()
@@ -95,9 +87,6 @@ def load_facts(conn: sqlite3.Connection, known_source_ids: set[str]) -> list[tup
 
 
 def load_data():
-    """Full pipeline: init tables, load sources, load facts, report orphans.
-    This is the function that was missing -- call this to actually populate
-    the database from your local-knowledge-base/ JSON files."""
     init_db()
     conn = sqlite3.connect(DB_PATH)
 
@@ -123,9 +112,6 @@ def load_data():
 
 
 def check_orphans_standalone():
-    """Run this on its own (without reloading anything) to audit the JSON
-    files on disk for orphan facts, without touching the database at all.
-    Useful as a pre-commit / CI check before load_data() ever runs."""
     source_ids = set()
     for path in SOURCES_DIR.glob("*.json"):
         try:

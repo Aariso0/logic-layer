@@ -4,14 +4,13 @@ import faiss
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
 
-# Setup paths relative to the project root
 DB_PATH = Path("local-knowledge-base/knowledge_base.db")
 INDEX_PATH = Path("local-knowledge-base/embeddings/faiss_index.bin")
 MAP_PATH = Path("local-knowledge-base/embeddings/fact_mapping.txt")
 
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
-_model = None  # lazy-loaded so importing this module elsewhere doesn't force a download
+_model = None
 
 
 def get_model() -> SentenceTransformer:
@@ -23,7 +22,7 @@ def get_model() -> SentenceTransformer:
 
 
 def build_embeddings_index():
-    """Reads facts from SQLite and saves a guarded FAISS index."""
+    """Reads facts from SQLite and saves a guarded FAISS index over statements."""
     print("🤖 Initializing semantic embedding pipeline...")
 
     INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -34,7 +33,7 @@ def build_embeddings_index():
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT fact_id, claim FROM facts")
+    cursor.execute("SELECT fact_id, statement FROM facts")
     rows = cursor.fetchall()
     conn.close()
 
@@ -45,13 +44,13 @@ def build_embeddings_index():
     print(f"📖 Found {len(rows)} facts to process. Generating neural embeddings...")
 
     fact_ids = [row[0] for row in rows]
-    claims = [row[1] for row in rows]
+    statements = [row[1] for row in rows]
 
     model = get_model()
-    vectors_matrix = model.encode(claims, normalize_embeddings=True).astype('float32')
+    vectors_matrix = model.encode(statements, normalize_embeddings=True).astype('float32')
     dimensions = vectors_matrix.shape[1]
 
-    index = faiss.IndexFlatIP(dimensions)  # inner product on normalized vectors = cosine similarity
+    index = faiss.IndexFlatIP(dimensions)
     index.add(vectors_matrix)
 
     if index.ntotal != len(fact_ids):

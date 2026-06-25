@@ -1,6 +1,5 @@
 {
   "fact_id": "fact_010",
-  "claim": "Approximate U.S. resident population",
-  "value": "Approximately 335 million as of the most recent Census Bureau estimate",
+  "statement": "Approximate U.S. resident population: Approximately 335 million as of the most recent Census Bureau estimate",
   "source_id": "src_005"
 }

@@ -1,6 +1,5 @@
 {
   "fact_id": "fact_004",
-  "claim": "First humans to walk on the Moon",
-  "value": "Neil Armstrong and Buzz Aldrin",
+  "statement": "First humans to walk on the Moon: Neil Armstrong and Buzz Aldrin",
   "source_id": "src_003"
 }
