@@ -81,7 +81,7 @@ logic-layer/
 - [ ] Normalize results into the same JSON evidence shape as `check_local_db`'s output 
 - [ ] Cache hits back into `local-knowledge-base/facts/` as new fact entries (same file, calls into `logiclayer/knowledge_base/loader.py`)(automaticaley creating the database)
 
-## 3. Then set up Ollama and Qwen3.5 4B - aaditya"
+## 3. Then set up Ollama and Qwen3.5 4B - aaditya
 
 This is the part that needs its own attention — Ollama doesn't give you tool-calling for free, you write the loop yourself.
 
