@@ -22,8 +22,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-"""
+
 MAX_TRY = 3 #number of tries to import any file
+"""
 for attempt in range(1, MAX_TRY+1):
     try:
         # 2. Importing real ollama client.py
@@ -61,8 +62,8 @@ for attempt in range(1, MAX_TRY+1):
 for attempt in range(1, MAX_TRY+1):
     try:
         # Integration with the logger module created
-        from logiclayer.logging.logger import log_query, log_tool_call
-        logger.info("Successfully imported logger -> log_query, log_tool_call")
+        from logiclayer.logging.logger import log_prompt, log_tool_call
+        logger.info("Successfully imported logger -> log_prompt, log_tool_call")
         break
 
     except ImportError as e:
@@ -73,7 +74,7 @@ for attempt in range(1, MAX_TRY+1):
 
         importlib.invalid_caches()
         await asyncio.sleep(0.05)
-
+"""
 for attempt in range(1, MAX_TRY+1):
     try:
         #importing connector as per Kunal's code
@@ -86,10 +87,24 @@ for attempt in range(1, MAX_TRY+1):
         if attempt == MAX_TRY:
             logger.critical("Maximum attempts reached. Crashing application safely!!")
             raise e
+        importlib.invalidate_caches()
+        time.sleep(0.05)
 
-        importlib.invalid_caches()
-        await asyncio.sleep(0.05)
+for attempt in range(1, MAX_TRY+1):
+    try:
+        #importing connector as per Kunal's code
+        from logiclayer.verifier.system_prompt import build_system_prompt
+        logger.info("Successfully imported system_prompt -> build_system_prompt")
+        break
 
+    except ImportError as e:
+        logger.error(f"Attempt {attempt}/{MAX_TRY} : system_prompt file missing! Initializing fallback.")
+        if attempt == MAX_TRY:
+            logger.critical("Maximum attempts reached. Crashing application safely!!")
+            raise e
+        importlib.invalidate_caches()
+        time.sleep(0.05)
+"""
 for attempt in range(1, MAX_TRY+1):
     try:
         #importing system_prompt as per plan.md
@@ -107,35 +122,35 @@ for attempt in range(1, MAX_TRY+1):
         await asyncio.sleep(0.05)
 """
 
-"""
+
 # --- Mocking external dependencies for the sake of functionality ---
 # In real code, these would be our actual imports.
 try:
     from logiclayer.verifier.tools import check_local_db, search_trusted_sources, report_verdict
-    from logiclayer.logging.logger import log_query, log_tool_call
-    from logiclayer.connectors.nvidia_connector import NvidiaConnector
+    from logiclayer.logging.logger import log_prompt, log_tool_call
+    #from logiclayer.connectors.nvidia_connector import NvidiaConnector
     from logiclayer.verifier.system_prompt import sys_prompt
 except ImportError:
     # Dummy fallbacks so the file can compile and run independently
     async def check_local_db(claim: str): return {}
     async def search_trusted_sources(claim: str): return {}
     async def report_verdict(record: dict): pass
-    def log_query(q): pass
+    def log_prompt(q): pass
     def sys_prompt(response): return [response]
-    class NvidiaConnector:
-        async def send(self, prompt: str): return "Dummy raw response"
+    #class NvidiaConnector:
+        #async def send(self, prompt: str): return "Dummy raw response"
+
 """
-
-
+# ==============================================================================
 # DEFENSIVE DYNAMIC IMPORT LOOKUP ENGINE
 # ==============================================================================
 
 def safe_dynamic_import(module_path: str, attributes: List[str]) -> Dict[str, Any]:
-    """
-    Dynamically loads attributes from an external module at runtime.
-    If the module is healthy, it maps the real functions/classes.
-    If it is broken, it cleanly creates non-breaking fallback systems.
-    """
+    
+    #Dynamically loads attributes from an external module at runtime.
+    #If the module is healthy, it maps the real functions/classes.
+    #If it is broken, it cleanly creates non-breaking fallback systems.
+    
     resolved_components = {}
     try:
         # Dynamically evaluate the local workspace file state
@@ -157,7 +172,7 @@ def safe_dynamic_import(module_path: str, attributes: List[str]) -> Dict[str, An
             elif attr == "report_verdict":
                 async def mock_report(*args, **kwargs): pass
                 resolved_components[attr] = mock_report
-            elif attr in ["log_query", "log_tool_call"]:
+            elif attr in ["log_prompt", "log_tool_call"]:
                 resolved_components[attr] = lambda *args, **kwargs: None
             elif attr == "NvidiaConnector":
                 class MockNvidiaConnector:
@@ -173,7 +188,7 @@ def safe_dynamic_import(module_path: str, attributes: List[str]) -> Dict[str, An
 ollama_registry = safe_dynamic_import("logiclayer.verifier.ollama_client", ["call_ollama"])
 tools_registry  = safe_dynamic_import("logiclayer.verifier.tools", ["check_local_db", "search_trusted_sources", "report_verdict"])
 prompt_registry = safe_dynamic_import("logiclayer.verifier.system_prompt", ["sys_prompt"])
-logger_registry = safe_dynamic_import("logiclayer.logging.logger", ["log_query", "log_tool_call"])
+logger_registry = safe_dynamic_import("logiclayer.logging.logger", ["log_prompt", "log_tool_call"])
 nv_registry     = safe_dynamic_import("logiclayer.connectors.nvidia_connector", ["NvidiaConnector"])
 
 # Extract runtime active reference pointers (Real code if working, Fallback if broken)
@@ -182,10 +197,10 @@ check_local_db = tools_registry.get("check_local_db")
 search_trusted_sources = tools_registry.get("search_trusted_sources")
 report_verdict = tools_registry.get("report_verdict")
 sys_prompt = prompt_registry.get("sys_prompt")
-log_query = logger_registry.get("log_query")
+log_prompt = logger_registry.get("log_prompt")
 log_tool_call = logger_registry.get("log_tool_call")
 NvidiaConnector = nv_registry.get("NvidiaConnector")
-
+"""
 
 # ==============================================================================
 # CORE RESILIENT ORCHESTRATION ENGINE
@@ -197,16 +212,13 @@ class OrchestrationEngine:
         Accepts a live initialized connector wrapper instance.
         Falls back to default healthy initialization if none is supplied.
         """
-        if agent_connector is not None:
-            self.agent_connector = agent_connector
-        else:
-            try:
-                self.agent_connector = NvidiaConnector()
-            except Exception as e:
-                logger.error(f"Could not initialize raw NvidiaConnector class: {e}")
-                class EmergencyConnector:
-                    async def send(self, p: str): return "Emergency structural return text"
-                self.agent_connector = EmergencyConnector()
+        try:
+            self.agent_connector = NvidiaConnector()
+        except Exception as e:
+            logger.error(f"Could not initialize raw NvidiaConnector class: {e}")
+            class EmergencyConnector:
+                async def send(self, p: str): return "Emergency structural return text"
+            self.agent_connector = EmergencyConnector()
 
     async def process_response_stream(self, prompt: str) -> Dict[str, Any]:
         """
@@ -228,10 +240,16 @@ class OrchestrationEngine:
                 logger.info("Successfully fetched raw output block from Agent.")
             except Exception as conn_err:
                 logger.critical(f"Target Agent connector dropped execution stream: {conn_err}")
-                raise RuntimeError(f"Connector Execution Breakage: {conn_err}")
+                #raise RuntimeError(f"Connector Execution Breakage: {conn_err}")
+                #------Fallback mock
+                logger.warning("API Key missing/ connection Failed. Used mock AI response")
+                raw_response = (
+                    "This is an emergeny mock AI response. The system is operating"
+                    "in offline safety mode due to a missing API key configuration"
+                )
 
             # Audit trace log capture
-            log_query(raw_response)
+            #log_prompt(prompt)
 
             # 2. Parse Claims out from the Response block
             try:
@@ -296,7 +314,7 @@ class OrchestrationEngine:
                         logger.warning(f"Local DB timeout for claim: {claim_text[:20]}...")
                         claim_record["tier_used"] = "timeout_failure"
                         await report_verdict(claim_record)
-                        return claim_record
+                        return claim_record 
                     except Exception as db_err:
                         logger.error(f"Local DB module script error handled cleanly: {db_err}")
 
