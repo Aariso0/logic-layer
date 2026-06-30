@@ -49,7 +49,7 @@ def init_logger():
         CREATE TABLE IF NOT EXISTS queries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT NOT NULL,
-            query_text TEXT NOT NULL
+            prompt_text TEXT NOT NULL
         )
     """)
     
@@ -71,8 +71,8 @@ def init_logger():
 init_logger()
 
 
-def log_query(query_text: str):
-    """Logs the entry point raw text query into both SQLite and JSONL formats."""
+def log_prompt(prompt_text: str):
+    """Logs the entry point raw text prompt into both SQLite and JSONL formats."""
     timestamp = datetime.now(timezone.utc).isoformat()
     
     # 1. SQLite Write
@@ -80,25 +80,25 @@ def log_query(query_text: str):
         connector = sqlite3.connect(DB_PATH)
         cursor = connector.cursor()
         cursor.execute(
-            "INSERT INTO queries (timestamp, query_text) VALUES (?, ?)",
-            (timestamp, query_text)
+            "INSERT INTO queries (timestamp, prompt_text) VALUES (?, ?)",
+            (timestamp, prompt_text)
         )
         connector.commit()
         connector.close()
     except Exception as e:
-        print(f"[Logger Error] SQLite query logging failed: {e}")
+        print(f"[Logger Error] SQLite prompt logging failed: {e}")
 
     # 2. JSONL Write (Appends structured logs cleanly line-by-line)
     try:
         log_entry = {
             "type": "user_query",
             "timestamp": timestamp,
-            "query": query_text
+            "prompt": prompt_text
         }
         with open(JSON_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps(log_entry) + "\n")
     except Exception as e:
-        print(f"[Logger Error] JSON query logging failed: {e}")
+        print(f"[Logger Error] JSON prompt logging failed: {e}")
 
 
 def log_tool_call(tool_name: str, arguments: Dict[str, Any], result: str):

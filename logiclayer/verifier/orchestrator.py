@@ -22,31 +22,31 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-
 MAX_TRY = 3 #number of tries to import any file
-"""
+
 for attempt in range(1, MAX_TRY+1):
     try:
-        # 2. Importing real ollama client.py
-        #Aaditya focus that I have mentioned call_ollama we will discuss it according to your setup
-        from logiclayer.verifier.ollama_client import call_ollama 
+        from logiclayer.verifier import ollama_client
         logger.info("Successfully imported call_ollama.")
         break
-        
+     
     except ImportError as e:
         logger.error(f"Attempt {attempt}/{MAX_TRY} : ollama_client.py could not be found!")
         if attempt == MAX_TRY:
             logger.critical("Maximum attempts reached. Crashing application safely!!")
             raise e
 
-        importlib.invalid_caches()
-        await asyncio.sleep(0.05)
+        importlib.invalidate_caches()
+        time.sleep(0.05)
         
+# Expose functions explicitly at module scope to permit clean execution & mocking access
+check_local_db = None
+search_trusted_sources = None
+report_verdict = None
+
 for attempt in range(1, MAX_TRY+1):
     try:
-        # 4. Importing functions from logiclayer/verifier/tools.py
-        #Announcement folks here I have named  check_local_db, search_trusted_sources, report_verdict from the tools.py
-        from logiclayer.verifier.tools import check_local_db, search_trusted_sources, report_verdict
+        from logiclayer.verifier.tools import run_check_local_db as cldb, run_search_trusted_sources as rst, run_report_verdict as rv
         logger.info("Successfully imported tools -> check_local_db, search_trusted_sources, report_verdict.")
         break
 
@@ -56,8 +56,8 @@ for attempt in range(1, MAX_TRY+1):
             logger.critical("Maximum attempts reached. Crashing application safely!!")
             raise e
 
-        importlib.invalid_caches()
-        await asyncio.sleep(0.05)
+        importlib.invalidate_caches()
+        time.sleep(0.05)
 
 for attempt in range(1, MAX_TRY+1):
     try:
@@ -72,12 +72,11 @@ for attempt in range(1, MAX_TRY+1):
             logger.critical("Maximum attempts reached. Crashing application safely!!")
             raise e
 
-        importlib.invalid_caches()
-        await asyncio.sleep(0.05)
-"""
+        importlib.invalidate_caches()
+        time.sleep(0.05)
+
 for attempt in range(1, MAX_TRY+1):
     try:
-        #importing connector as per Kunal's code
         from logiclayer.connectors.nvidia_connector import NvidiaConnector
         logger.info("Successfully imported nvidia_connector -> NvidiaConnector")
         break
@@ -90,10 +89,12 @@ for attempt in range(1, MAX_TRY+1):
         importlib.invalidate_caches()
         time.sleep(0.05)
 
+# Setup a direct reference for patching and orchestration fallback calls
+build_system_prompt = None
 for attempt in range(1, MAX_TRY+1):
     try:
-        #importing connector as per Kunal's code
-        from logiclayer.verifier.system_prompt import build_system_prompt
+        from logiclayer.verifier.system_prompt import build_system_prompt as bsp
+        build_system_prompt = bsp
         logger.info("Successfully imported system_prompt -> build_system_prompt")
         break
 
@@ -104,106 +105,24 @@ for attempt in range(1, MAX_TRY+1):
             raise e
         importlib.invalidate_caches()
         time.sleep(0.05)
-"""
+
 for attempt in range(1, MAX_TRY+1):
     try:
-        #importing system_prompt as per plan.md
-        from logiclayer.verifier.system_prompt import sys_prompt
-        logger.info("Successfully imported system_prompt -> sys_prompt")
+        from logiclayer.reporting import formatter
+        logger.info("Successfully imported reporting -> formatter")
         break
 
     except ImportError as e:
-        logger.error(f"Attempt {attempt}/{MAX_TRY} : system_prompt file missing! Initializing fallback.")
+        logger.error(f"Attempt {attempt}/{MAX_TRY} : formatter file missing! Initializing fallback.")
         if attempt == MAX_TRY:
             logger.critical("Maximum attempts reached. Crashing application safely!!")
             raise e
+        importlib.invalidate_caches()
+        time.sleep(0.05)
 
-        importlib.invalid_caches()
-        await asyncio.sleep(0.05)
-"""
-
-
-# --- Mocking external dependencies for the sake of functionality ---
-# In real code, these would be our actual imports.
-try:
-    from logiclayer.verifier.tools import check_local_db, search_trusted_sources, report_verdict
-    from logiclayer.logging.logger import log_prompt, log_tool_call
-    #from logiclayer.connectors.nvidia_connector import NvidiaConnector
-    from logiclayer.verifier.system_prompt import sys_prompt
-except ImportError:
-    # Dummy fallbacks so the file can compile and run independently
-    async def check_local_db(claim: str): return {}
-    async def search_trusted_sources(claim: str): return {}
-    async def report_verdict(record: dict): pass
-    def log_prompt(q): pass
-    def sys_prompt(response): return [response]
-    #class NvidiaConnector:
-        #async def send(self, prompt: str): return "Dummy raw response"
-
-"""
-# ==============================================================================
-# DEFENSIVE DYNAMIC IMPORT LOOKUP ENGINE
-# ==============================================================================
-
-def safe_dynamic_import(module_path: str, attributes: List[str]) -> Dict[str, Any]:
-    
-    #Dynamically loads attributes from an external module at runtime.
-    #If the module is healthy, it maps the real functions/classes.
-    #If it is broken, it cleanly creates non-breaking fallback systems.
-    
-    resolved_components = {}
-    try:
-        # Dynamically evaluate the local workspace file state
-        mod = importlib.import_module(module_path)
-        for attr in attributes:
-            resolved_components[attr] = getattr(mod, attr)
-        logger.info(f"[DEPENDENCY SUCCESS] Cleanly mapped real properties from: {module_path}")
-    except Exception as failure_context:
-        logger.error(f"[ISOLATION WARNING] Fault detected in team module '{module_path}': {failure_context}")
-        logger.warning(f"Activating functional fallback stubs for properties: {attributes}")
-        
-        # Inject standard fallback behaviors so your core loop never breaks
-        for attr in attributes:
-            if attr == "sys_prompt":
-                resolved_components[attr] = lambda raw_text: [raw_text] if isinstance(raw_text, str) else []
-            elif attr in ["check_local_db", "search_trusted_sources"]:
-                async def mock_miss(*args, **kwargs): return {}
-                resolved_components[attr] = mock_miss
-            elif attr == "report_verdict":
-                async def mock_report(*args, **kwargs): pass
-                resolved_components[attr] = mock_report
-            elif attr in ["log_prompt", "log_tool_call"]:
-                resolved_components[attr] = lambda *args, **kwargs: None
-            elif attr == "NvidiaConnector":
-                class MockNvidiaConnector:
-                    async def send(self, prompt_text: str): return f"Fallback mock response text"
-                resolved_components[attr] = MockNvidiaConnector
-            else:
-                resolved_components[attr] = None
-                
-    return resolved_components
-
-
-# Safely decouple module execution lines
-ollama_registry = safe_dynamic_import("logiclayer.verifier.ollama_client", ["call_ollama"])
-tools_registry  = safe_dynamic_import("logiclayer.verifier.tools", ["check_local_db", "search_trusted_sources", "report_verdict"])
-prompt_registry = safe_dynamic_import("logiclayer.verifier.system_prompt", ["sys_prompt"])
-logger_registry = safe_dynamic_import("logiclayer.logging.logger", ["log_prompt", "log_tool_call"])
-nv_registry     = safe_dynamic_import("logiclayer.connectors.nvidia_connector", ["NvidiaConnector"])
-
-# Extract runtime active reference pointers (Real code if working, Fallback if broken)
-call_ollama = ollama_registry.get("call_ollama")
-check_local_db = tools_registry.get("check_local_db")
-search_trusted_sources = tools_registry.get("search_trusted_sources")
-report_verdict = tools_registry.get("report_verdict")
-sys_prompt = prompt_registry.get("sys_prompt")
-log_prompt = logger_registry.get("log_prompt")
-log_tool_call = logger_registry.get("log_tool_call")
-NvidiaConnector = nv_registry.get("NvidiaConnector")
-"""
 
 # ==============================================================================
-# CORE RESILIENT ORCHESTRATION ENGINE
+# CORE ORCHESTRATION ENGINE
 # ==============================================================================
 
 class OrchestrationEngine:
@@ -212,13 +131,18 @@ class OrchestrationEngine:
         Accepts a live initialized connector wrapper instance.
         Falls back to default healthy initialization if none is supplied.
         """
-        try:
-            self.agent_connector = NvidiaConnector()
-        except Exception as e:
-            logger.error(f"Could not initialize raw NvidiaConnector class: {e}")
-            class EmergencyConnector:
-                async def send(self, p: str): return "Emergency structural return text"
-            self.agent_connector = EmergencyConnector()
+        if agent_connector is not None:
+            self.agent_connector = agent_connector
+            logger.info("Using injected mock connector setup.")
+        else:
+            try:
+                self.agent_connector = NvidiaConnector()
+                logger.info("NvidiaConnector successfully connected")
+            except Exception as e:
+                logger.error(f"Could not initialize NvidiaConnector class: {e}, Using EmergencyConnector")
+                class EmergencyConnector:
+                    async def send(self, p: str): return "Emergency structural return text"
+                self.agent_connector = EmergencyConnector()
 
     async def process_response_stream(self, prompt: str) -> Dict[str, Any]:
         """
@@ -238,9 +162,9 @@ class OrchestrationEngine:
             try:
                 raw_response = await self.agent_connector.send(prompt)
                 logger.info("Successfully fetched raw output block from Agent.")
+
             except Exception as conn_err:
                 logger.critical(f"Target Agent connector dropped execution stream: {conn_err}")
-                #raise RuntimeError(f"Connector Execution Breakage: {conn_err}")
                 #------Fallback mock
                 logger.warning("API Key missing/ connection Failed. Used mock AI response")
                 raw_response = (
@@ -249,15 +173,20 @@ class OrchestrationEngine:
                 )
 
             # Audit trace log capture
-            #log_prompt(prompt)
-
-            # 2. Parse Claims out from the Response block
             try:
-                system_prompt_response = sys_prompt(raw_response)
-            except Exception as e:
-                logger.error(f"System prompt extractor failed: {e}. Defaulting to text split.")
-                system_prompt_response = raw_response
+                log_prompt(prompt)
+            except Exception:
+                pass
 
+            # 2.A build the prompt given to the ollama client by system
+            system_prompt_response = []
+            try:
+                system_prompt_response = await build_system_prompt(raw_response)
+            except Exception as e:
+                logger.error(f"System prompt build-up failed: {e}.")
+                system_prompt_response = ["Emergency return text"]
+
+            # 2.B send the prompt to ollama_client and get the response in return
             # 3. Clean up and normalize incoming data structural layouts
             claims_list = []
             if isinstance(system_prompt_response, str):
