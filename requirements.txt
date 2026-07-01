@@ -50,5 +50,10 @@ faiss-cpu>=1.7
 requests>=2.0
 beautifulsoup4>=4.0
 python-dotenv>=1.0
+spacy>=3.7
 pytest>=7.0
 ruff>=0.1.0
+
+# spaCy English model (downloaded separately via:
+#   python -m spacy download en_core_web_sm
+# or as a post-install hook in pyproject.toml)
