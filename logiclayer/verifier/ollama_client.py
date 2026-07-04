@@ -15,13 +15,19 @@ gate which tools are offered without touching the prompt.
 from __future__ import annotations
 
 import json
+import os
 import urllib.error
 import urllib.request
 from typing import Any
 
-OLLAMA_HOST = "http://localhost:11434"
+# Read the Ollama host from the environment so the same client works both
+# in local dev (default http://localhost:11434) and inside a container /
+# remote box pointed at via OLLAMA_HOST. Falling back to localhost matches
+# the build plan (##3) and keeps the install-elsewhere case (step 13) a
+# pure env-var change.
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 CHAT_ENDPOINT = f"{OLLAMA_HOST}/api/chat"
-DEFAULT_MODEL = "qwen3.5:4b"
+DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3.5:4b")
 REQUEST_TIMEOUT = 120  # seconds
 
 
